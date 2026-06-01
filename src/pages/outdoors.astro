@@ -2,12 +2,23 @@
 import Base from '../layouts/Base.astro';
 import MasonryGallery from '../components/MasonryGallery.astro';
 import { outdoorsPhotos } from '../data/photos';
+import { getImageSize } from '../utils/getImageSize';
+import path from 'node:path';
+
+const images = outdoorsPhotos.map(photo => {
+  const thumbPath = path.join(
+    process.cwd(),
+    photo.src.replace('/images/', 'public/images/').replace('/outdoors/', '/outdoors/thumbs/')
+  );
+  const { width, height } = getImageSize(thumbPath);
+  return { ...photo, width, height };
+});
 ---
 
 <Base title="Outdoors" description="Outdoor photography by Robert Slowinski">
   <div class="page-title">
     <h1>Outdoors</h1>
-    <span class="count">{outdoorsPhotos.length} photographs</span>
+    <span class="count">{images.length} photographs</span>
   </div>
-  <MasonryGallery images={outdoorsPhotos} category="outdoors" extraClass="masonry--gallery" />
+  <MasonryGallery images={images} category="outdoors" extraClass="masonry--gallery" />
 </Base>

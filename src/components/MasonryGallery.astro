@@ -1,6 +1,6 @@
 ---
 interface Props {
-  images: { src: string; alt: string; index: number }[];
+  images: { src: string; alt: string; index: number; width?: number; height?: number }[];
   category: string;
   extraClass?: string;
 }
@@ -32,6 +32,8 @@ const EAGER_COUNT = 15;
       <img
         src={thumbSrc(img.src)}
         alt={img.alt}
+        width={img.width}
+        height={img.height}
         loading={img.index < EAGER_COUNT ? 'eager' : 'lazy'}
         decoding={img.index < EAGER_COUNT ? 'sync' : 'async'}
         fetchpriority={img.index < 5 ? 'high' : undefined}
