@@ -5,6 +5,17 @@ interface Props {
   extraClass?: string;
 }
 const { images, category, extraClass = '' } = Astro.props;
+
+// Derive thumbnail path from full-size path
+// e.g. /images/travel/travel-031.jpg → /images/travel/thumbs/travel-031.jpg
+function thumbSrc(src: string): string {
+  const parts = src.split('/');
+  const filename = parts.pop();
+  return [...parts, 'thumbs', filename].join('/');
+}
+
+// First 15 images are above the fold — load eagerly, rest lazily
+const EAGER_COUNT = 15;
 ---
 
 <div class={`masonry ${extraClass}`} id="gallery">
@@ -19,10 +30,11 @@ const { images, category, extraClass = '' } = Astro.props;
       aria-label={`Open ${img.alt} in lightbox`}
     >
       <img
-        src={img.src}
+        src={thumbSrc(img.src)}
         alt={img.alt}
-        loading="lazy"
-        decoding="async"
+        loading={img.index < EAGER_COUNT ? 'eager' : 'lazy'}
+        decoding={img.index < EAGER_COUNT ? 'sync' : 'async'}
+        fetchpriority={img.index < 5 ? 'high' : undefined}
       />
     </div>
   ))}
@@ -53,12 +65,23 @@ const { images, category, extraClass = '' } = Astro.props;
   const lbCounter = document.getElementById('lb-counter');
   let current = 0;
 
+  // Preload the next full-size image in the background
+  function preload(index) {
+    const i = (index + 1) % totalImages;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.as = 'image';
+    link.href = items[i].dataset.src;
+    document.head.appendChild(link);
+  }
+
   function open(index) {
     current = index;
     update();
     lightbox.classList.add('is-open');
     document.body.style.overflow = 'hidden';
     document.getElementById('lb-close').focus();
+    preload(index);
   }
 
   function close() {
@@ -69,13 +92,21 @@ const { images, category, extraClass = '' } = Astro.props;
 
   function update() {
     const item = items[current];
-    lbImg.src = item.dataset.src;
+    // Show thumbnail immediately, swap to full-size once loaded
+    const fullSrc = item.dataset.src;
     lbImg.alt = item.dataset.alt;
+    lbImg.style.opacity = '0.6';
+    const full = new Image();
+    full.onload = () => {
+      lbImg.src = fullSrc;
+      lbImg.style.opacity = '1';
+    };
+    full.src = fullSrc;
     lbCounter.textContent = `${current + 1} / ${totalImages}`;
   }
 
-  function prev() { current = (current - 1 + totalImages) % totalImages; update(); }
-  function next() { current = (current + 1) % totalImages; update(); }
+  function prev() { current = (current - 1 + totalImages) % totalImages; update(); preload(current); }
+  function next() { current = (current + 1) % totalImages; update(); preload(current); }
 
   // Click to open
   items.forEach((item, i) => {

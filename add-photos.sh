@@ -82,11 +82,16 @@ for src in "${SOURCE_FILES[@]}"; do
   # Copy first, then optimise in-place using sips (macOS built-in)
   cp "$src" "$dest"
 
-  # Resize if wider than MAX_WIDTH (sips preserves aspect ratio)
+  # Resize full-size if wider than MAX_WIDTH (sips preserves aspect ratio)
   sips --resampleWidth "$MAX_WIDTH" \
        --setProperty formatOptions "$QUALITY" \
        "$dest" --out "$dest" \
        > /dev/null 2>&1
+
+  # Generate thumbnail (600px wide, 78% quality) for the masonry grid
+  mkdir -p "$DEST_DIR/thumbs"
+  sips --resampleWidth 600 "$dest" --out "$DEST_DIR/thumbs/$filename" > /dev/null 2>&1
+  sips --setProperty formatOptions 78 "$DEST_DIR/thumbs/$filename" > /dev/null 2>&1
 
   ADDED_FILENAMES+=("$filename")
   (( next++ ))
