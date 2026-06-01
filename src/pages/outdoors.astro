@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import MasonryGallery from '../components/MasonryGallery.astro';
+import { outdoorsPhotos } from '../data/photos';
+---
+
+<Base title="Outdoors" description="Outdoor photography by Robert Slowinski">
+  <div class="page-title">
+    <h1>Outdoors</h1>
+    <span class="count">{outdoorsPhotos.length} photographs</span>
+  </div>
+  <MasonryGallery images={outdoorsPhotos} category="outdoors" extraClass="masonry--gallery" />
+</Base>

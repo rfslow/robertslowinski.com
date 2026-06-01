@@ -1,0 +1,288 @@
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f9f8f6;
+  --surface:   #ffffff;
+  --border:    #e0ddd8;
+  --text:      #222222;
+  --muted:     #888888;
+  --faint:     #bbbbbb;
+  --accent:    #333333;
+  --gap:       5px;
+  --nav-h:     64px;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-serif: 'Georgia', serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+
+img { display: block; max-width: 100%; }
+
+/* ── Utility ── */
+.u-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Header / Nav ── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: var(--nav-h);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+}
+
+.site-name {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-nav {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+}
+
+.site-nav a {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+/* ── Page header ── */
+.page-title {
+  padding: 2.2rem 2.5rem 1.2rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+}
+.page-title h1 {
+  font-size: 0.72rem;
+  font-weight: normal;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.page-title .count {
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+
+/* ── Footer ── */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+}
+.site-footer a { color: var(--faint); transition: color 0.2s; }
+.site-footer a:hover { color: var(--muted); }
+
+/* ── Masonry gallery ── */
+.masonry {
+  columns: 5;
+  column-gap: var(--gap);
+  padding: 0 2.5rem 5rem;
+}
+
+/* Slightly fewer columns on the sub-gallery pages (they have a page title bar) */
+.masonry--gallery {
+  columns: 4;
+}
+
+.masonry-item {
+  break-inside: avoid;
+  margin-bottom: var(--gap);
+  cursor: zoom-in;
+  position: relative;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.masonry-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: opacity 0.35s ease, transform 0.45s ease;
+}
+
+.masonry-item:hover img {
+  opacity: 0.88;
+  transform: scale(1.02);
+}
+
+@media (max-width: 1400px) { .masonry { columns: 4; } .masonry--gallery { columns: 3; } }
+@media (max-width: 1000px) { .masonry { columns: 3; } .masonry--gallery { columns: 3; } }
+@media (max-width: 700px)  { .masonry { columns: 2; } .masonry--gallery { columns: 2; } }
+@media (max-width: 480px)  { .masonry { columns: 1; padding: 0 1rem 4rem; } .masonry--gallery { columns: 1; padding: 0 1rem 4rem; } }
+
+/* ── Lightbox ── */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(249, 248, 246, 0.97);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox.is-open { display: flex; }
+
+.lb-img-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1rem 5rem;
+  min-height: 0;
+}
+
+.lb-img-wrap img {
+  max-height: calc(100vh - 160px);
+  max-width: 100%;
+  object-fit: contain;
+  box-shadow: 0 4px 40px rgba(0,0,0,0.10);
+}
+
+.lb-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 2.5rem 1.8rem;
+}
+
+.lb-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color 0.2s;
+  padding: 0.5rem 0;
+  min-width: 80px;
+}
+.lb-btn:hover { color: var(--text); }
+.lb-btn.close { position: absolute; top: 1.2rem; right: 2rem; }
+
+.lb-counter {
+  font-size: 0.7rem;
+  color: var(--faint);
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+/* Keyboard hint */
+.lb-hint {
+  font-size: 0.65rem;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  text-align: center;
+  margin-top: 0.2rem;
+}
+
+/* ── Homepage intro bar ── */
+.home-intro {
+  padding: 1.8rem 2.5rem 0.6rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.home-intro h1 {
+  font-size: 0.72rem;
+  font-weight: normal;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-intro .count { font-size: 0.72rem; color: var(--faint); }
+
+/* ── About page ── */
+.about-wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 3rem 2.5rem 5rem;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 3rem;
+  align-items: start;
+}
+.about-photo img {
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+  object-position: top;
+}
+.about-bio h1 {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: normal;
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.04em;
+}
+.about-bio .location {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.8rem;
+}
+.about-bio p {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: #444;
+  margin-bottom: 1.2rem;
+}
+.about-bio .contact {
+  margin-top: 2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.about-bio .contact a { border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
+.about-bio .contact a:hover { border-bottom-color: var(--muted); }
+
+@media (max-width: 640px) {
+  .about-wrap { grid-template-columns: 1fr; gap: 2rem; }
+}

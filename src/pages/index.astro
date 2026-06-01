@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import MasonryGallery from '../components/MasonryGallery.astro';
+import { travelPhotos } from '../data/photos';
+---
+
+<Base title="Photography" description="Photography by Robert Slowinski — Travel, Outdoors, Lifestyle">
+  <div class="home-intro">
+    <h1>Selected Work — Travel</h1>
+    <span class="count">{travelPhotos.length} photographs</span>
+  </div>
+  <MasonryGallery images={travelPhotos} category="travel" />
+</Base>
