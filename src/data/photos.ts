@@ -1,37 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Photo ordering for robertslowinski.com
 //
-// HOW IT WORKS
-// Each category has three sections that are combined in order:
+// PINNED photos are managed via the admin UI (run: npm run admin)
+// or by editing src/data/pinned.json directly.
 //
-//   PINNED  → always appear first (your all-time favourites)
-//             Edit this list manually whenever you want to promote a photo.
+// NEW photos are inserted automatically by add-photos.sh.
 //
-//   NEW     → new uploads land here, newest first, right after pinned.
-//             The add-photos.sh script inserts into this section automatically.
-//             You never need to touch this manually.
-//
-//   ARCHIVE → your original curated order from the Squarespace site.
-//             Leave this alone; it's the long tail of your gallery.
-//
-// To pin a photo: move its filename from NEW or ARCHIVE into PINNED.
-// To reorder: drag entries around within any section.
+// ARCHIVE is the original curated order — leave it alone.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import pinnedData from './pinned.json';
+
 function toFile(category: string, filename: string): string {
-  // filename is already the bare filename, e.g. "travel-031.jpg"
-  // or a legacy name like "travel-cover.jpg"
   return `/images/${category}/${filename}`;
 }
 
 // ── TRAVEL ───────────────────────────────────────────────────────────────────
 
-// ★ PINNED — always at the top. Edit freely.
-const travelPinned = [
-  'travel-031.jpg',
-  'travel-016.jpg',
-  'travel-048.jpg',
-];
+const travelPinned = pinnedData.travel;
 
 // ↑ NEW — add-photos.sh inserts above this line (do not remove this comment)
 const travelNew: string[] = [
@@ -54,12 +40,7 @@ const travelArchive = [
 
 // ── OUTDOORS ─────────────────────────────────────────────────────────────────
 
-// ★ PINNED — always at the top. Edit freely.
-const outdoorsPinned = [
-  'outdoors-054.jpg',
-  'outdoors-042.jpg',
-  'outdoors-045.jpg',
-];
+const outdoorsPinned = pinnedData.outdoors;
 
 // ↑ NEW — add-photos.sh inserts above this line (do not remove this comment)
 const outdoorsNew: string[] = [
@@ -84,12 +65,7 @@ const outdoorsArchive = [
 
 // ── LIFESTYLE ────────────────────────────────────────────────────────────────
 
-// ★ PINNED — always at the top. Edit freely.
-const lifestylePinned = [
-  'lifestyle-104.jpg',
-  'lifestyle-014.jpg',
-  'lifestyle-023.jpg',
-];
+const lifestylePinned = pinnedData.lifestyle;
 
 // ↑ NEW — add-photos.sh inserts above this line (do not remove this comment)
 const lifestyleNew: string[] = [
@@ -123,7 +99,10 @@ const lifestyleArchive = [
 // Combines pinned + new + archive for each category.
 
 function makePhotos(category: string, pinned: string[], newPhotos: string[], archive: string[]) {
-  return [...pinned, ...newPhotos, ...archive].map((filename, i) => ({
+  // Deduplicate: pinned photos are removed from archive/new so they only appear once
+  const seen = new Set([...pinned, ...newPhotos]);
+  const filteredArchive = archive.filter(f => !seen.has(f));
+  return [...pinned, ...newPhotos, ...filteredArchive].map((filename, i) => ({
     src: toFile(category, filename),
     alt: `${category.charAt(0).toUpperCase() + category.slice(1)} photograph ${i + 1}`,
     index: i,
