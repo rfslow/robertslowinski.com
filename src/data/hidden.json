@@ -1,5 +1,20 @@
 {
-  "travel": [],
+  "travel": [
+    "travel-002.jpg",
+    "travel-060.jpg",
+    "travel-061.jpg",
+    "travel-064.jpg",
+    "travel-047.jpg",
+    "travel-084.jpg",
+    "travel-069.jpg",
+    "travel-055.jpg",
+    "travel-070.jpg"
+  ],
   "outdoors": [],
-  "lifestyle": []
+  "lifestyle": [
+    "lifestyle-088.jpg",
+    "lifestyle-010.jpg",
+    "lifestyle-053.jpg",
+    "lifestyle-076.jpg"
+  ]
 }
