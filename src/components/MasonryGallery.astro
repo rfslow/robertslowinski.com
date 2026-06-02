@@ -2,7 +2,7 @@
 import placeholders from '../data/placeholders.json';
 
 interface Props {
-  images: { src: string; alt: string; index: number; width?: number; height?: number }[];
+  images: { src: string; alt: string; index: number; width?: number; height?: number; pinned?: boolean }[];
   category: string;
   extraClass?: string;
 }
@@ -37,6 +37,7 @@ const EAGER_COUNT = 10;
         data-index={img.index}
         data-src={img.src}
         data-alt={img.alt}
+        data-pinned={img.pinned ? 'true' : undefined}
         tabindex="0"
         role="button"
         aria-label={`Open ${img.alt} in lightbox`}
@@ -87,6 +88,8 @@ const EAGER_COUNT = 10;
     current: 0,
     total: 0,
     reqId: 0,
+    currentCols: 0,
+    resizeBound: false,
   };
 
   function preload(index: number) {
@@ -145,24 +148,97 @@ const EAGER_COUNT = 10;
   function prevImage() { state.current = (state.current - 1 + state.total) % state.total; updateLightbox(); preload(state.current); }
   function nextImage() { state.current = (state.current + 1) % state.total; updateLightbox(); preload(state.current); }
 
+  // Fisher-Yates shuffle (in place)
+  function shuffle<T>(arr: T[]): T[] {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // Pinned photos shuffled to the front (so they vary each load but stay up top),
+  // everything else in its curated order.
+  function orderItems(items: HTMLElement[]): HTMLElement[] {
+    const pinned = items.filter(i => i.dataset.pinned === 'true');
+    const rest   = items.filter(i => i.dataset.pinned !== 'true');
+    shuffle(pinned);
+    return [...pinned, ...rest];
+  }
+
+  // Column count by viewport width — mirrors the CSS breakpoints.
+  function getCols(gallery: HTMLElement): number {
+    const w = window.innerWidth;
+    const isGallery = gallery.classList.contains('masonry--gallery');
+    if (isGallery) return w > 1400 ? 4 : w > 700 ? 3 : w > 480 ? 2 : 1;
+    return w > 1400 ? 5 : w > 1000 ? 4 : w > 700 ? 3 : w > 480 ? 2 : 1;
+  }
+
+  function aspectRatio(item: HTMLElement): number {
+    const img = item.querySelector('img');
+    const w = parseFloat(img?.getAttribute('width') || '0');
+    const h = parseFloat(img?.getAttribute('height') || '0');
+    return (w > 0 && h > 0) ? h / w : 0.66;
+  }
+
+  // True masonry: place each photo in the currently-shortest column, in order.
+  // This fills the TOP ROW first, so the leading (pinned) photos land at the top.
+  function layout(gallery: HTMLElement) {
+    const cols = getCols(gallery);
+    state.currentCols = cols;
+    const colEls: HTMLElement[] = [];
+    const colHeights = new Array(cols).fill(0);
+    const frag = document.createDocumentFragment();
+    for (let c = 0; c < cols; c++) {
+      const col = document.createElement('div');
+      col.className = 'masonry-col';
+      colEls.push(col);
+      frag.appendChild(col);
+    }
+    for (const item of state.items) {
+      let min = 0;
+      for (let c = 1; c < cols; c++) if (colHeights[c] < colHeights[min]) min = c;
+      colEls[min].appendChild(item);
+      colHeights[min] += aspectRatio(item) + 0.04; // approximate gap
+    }
+    gallery.replaceChildren(frag);
+  }
+
   function setupGallery() {
     const gallery = document.getElementById('gallery');
     if (!gallery) return;
 
-    state.items     = Array.from(gallery.querySelectorAll('.masonry-item'));
+    const sourceItems = Array.from(gallery.querySelectorAll('.masonry-item')) as HTMLElement[];
+    state.items     = orderItems(sourceItems);
     state.lightbox  = document.getElementById('lightbox');
     state.lbImg     = document.getElementById('lb-img') as HTMLImageElement;
     state.lbCounter = document.getElementById('lb-counter');
     state.total     = state.items.length;
     state.current   = 0;
 
+    // Switch from CSS columns to JS flex-masonry, then lay out.
+    gallery.classList.add('masonry--js');
+    gallery.classList.add('reveal-on');
+    layout(gallery);
+
+    // Re-layout on resize when the column count changes (bound once).
+    if (!state.resizeBound) {
+      state.resizeBound = true;
+      let t: number;
+      window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = window.setTimeout(() => {
+          const g = document.getElementById('gallery');
+          if (g && getCols(g) !== state.currentCols) layout(g);
+        }, 150);
+      });
+    }
+
     // ── Blur-up: mark already-loaded (eager/cached) images as loaded ──
     state.items.forEach(item => {
       const img = item.querySelector('img.photo') as HTMLImageElement;
       if (img && img.getAttribute('src') && img.complete) img.classList.add('loaded');
     });
-
-    gallery.classList.add('reveal-on');
 
     if ('IntersectionObserver' in window) {
       // Observer 1: just-in-time loading. Fires ~500px before a tile is visible

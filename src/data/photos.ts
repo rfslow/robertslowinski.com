@@ -117,10 +117,12 @@ function makePhotos(
   const filteredPinned  = pinned.filter(f => !hide.has(f));
   const filteredNew     = newPhotos.filter(f => !hide.has(f));
   const filteredArchive = archive.filter(f => !seen.has(f) && !hide.has(f));
+  const pinnedSet = new Set(filteredPinned);
   return [...filteredPinned, ...filteredNew, ...filteredArchive].map((filename, i) => ({
     src: toFile(category, filename),
     alt: `${category.charAt(0).toUpperCase() + category.slice(1)} photograph ${i + 1}`,
     index: i,
+    pinned: pinnedSet.has(filename),
   }));
 }
 

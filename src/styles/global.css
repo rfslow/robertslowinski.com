@@ -125,6 +125,26 @@ img { display: block; max-width: 100%; }
   columns: 4;
 }
 
+/* JS-driven flex masonry (replaces CSS columns once JS runs).
+   Items are distributed into equal-width columns by the shortest-column
+   algorithm, so the first (pinned) photos fill the top row. */
+.masonry.masonry--js {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap);
+  columns: auto;
+}
+.masonry--js .masonry-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.masonry--js .masonry-item {
+  margin-bottom: 0;
+}
+
 .masonry-item {
   break-inside: avoid;
   margin-bottom: var(--gap);
