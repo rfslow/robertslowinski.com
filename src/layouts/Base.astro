@@ -12,6 +12,8 @@ const nav = [
   { href: "/lifestyle", label: "Lifestyle" },
   { href: "/about",     label: "About" },
 ];
+
+import { ClientRouter } from 'astro:transitions';
 ---
 <!doctype html>
 <html lang="en">
@@ -22,6 +24,7 @@ const nav = [
   <title>{title} — Robert Slowinski</title>
   <link rel="icon" href="/favicon.png" type="image/png" />
   <link rel="stylesheet" href="/styles/global.css" />
+  <ClientRouter />
 </head>
 <body>
 

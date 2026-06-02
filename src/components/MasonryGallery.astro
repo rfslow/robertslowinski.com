@@ -1,4 +1,6 @@
 ---
+import placeholders from '../data/placeholders.json';
+
 interface Props {
   images: { src: string; alt: string; index: number; width?: number; height?: number }[];
   category: string;
@@ -12,6 +14,12 @@ function thumbSrc(src: string): string {
   const parts = src.split('/');
   const filename = parts.pop();
   return [...parts, 'thumbs', filename].join('/');
+}
+
+// Look up the tiny blur-up placeholder for an image
+function lqip(src: string): string {
+  const key = src.replace('/images/', '');
+  return (placeholders as Record<string, string>)[key] ?? '';
 }
 
 // First 15 images are above the fold — load eagerly, rest lazily
@@ -29,7 +37,9 @@ const EAGER_COUNT = 15;
       role="button"
       aria-label={`Open ${img.alt} in lightbox`}
     >
+      <div class="lqip" style={`background-image:url(${lqip(img.src)})`}></div>
       <img
+        class="photo"
         src={thumbSrc(img.src)}
         alt={img.alt}
         width={img.width}
@@ -37,6 +47,7 @@ const EAGER_COUNT = 15;
         loading={img.index < EAGER_COUNT ? 'eager' : 'lazy'}
         decoding={img.index < EAGER_COUNT ? 'sync' : 'async'}
         fetchpriority={img.index < 5 ? 'high' : undefined}
+        onload="this.classList.add('loaded')"
       />
     </div>
   ))}
@@ -60,82 +71,127 @@ const EAGER_COUNT = 15;
   </div>
 </div>
 
-<script define:vars={{ totalImages: images.length }}>
-  const items = Array.from(document.querySelectorAll('.masonry-item'));
-  const lightbox = document.getElementById('lightbox');
-  const lbImg    = document.getElementById('lb-img');
-  const lbCounter = document.getElementById('lb-counter');
-  let current = 0;
+<script>
+  // Module-level state so document-level listeners (added once) can read the
+  // current page's gallery, even after client-side view transitions.
+  const state = {
+    items: [] as HTMLElement[],
+    lightbox: null as HTMLElement | null,
+    lbImg: null as HTMLImageElement | null,
+    lbCounter: null as HTMLElement | null,
+    current: 0,
+    total: 0,
+  };
 
-  // Preload the next full-size image in the background
-  function preload(index) {
-    const i = (index + 1) % totalImages;
+  function preload(index: number) {
+    if (!state.items.length) return;
+    const i = (index + 1) % state.total;
     const link = document.createElement('link');
     link.rel = 'prefetch';
     link.as = 'image';
-    link.href = items[i].dataset.src;
+    link.href = state.items[i].dataset.src!;
     document.head.appendChild(link);
   }
 
-  function open(index) {
-    current = index;
-    update();
-    lightbox.classList.add('is-open');
+  function openLightbox(index: number) {
+    state.current = index;
+    updateLightbox();
+    state.lightbox!.classList.add('is-open');
     document.body.style.overflow = 'hidden';
-    document.getElementById('lb-close').focus();
+    document.getElementById('lb-close')!.focus();
     preload(index);
   }
 
-  function close() {
-    lightbox.classList.remove('is-open');
+  function closeLightbox() {
+    state.lightbox!.classList.remove('is-open');
     document.body.style.overflow = '';
-    items[current].focus();
+    state.items[state.current]?.focus();
   }
 
-  function update() {
-    const item = items[current];
-    // Show thumbnail immediately, swap to full-size once loaded
-    const fullSrc = item.dataset.src;
-    lbImg.alt = item.dataset.alt;
-    lbImg.style.opacity = '0.6';
+  function updateLightbox() {
+    const item = state.items[state.current];
+    const fullSrc = item.dataset.src!;
+    state.lbImg!.alt = item.dataset.alt!;
+    state.lbImg!.style.opacity = '0.6';
     const full = new Image();
     full.onload = () => {
-      lbImg.src = fullSrc;
-      lbImg.style.opacity = '1';
+      state.lbImg!.src = fullSrc;
+      state.lbImg!.style.opacity = '1';
     };
     full.src = fullSrc;
-    lbCounter.textContent = `${current + 1} / ${totalImages}`;
+    state.lbCounter!.textContent = `${state.current + 1} / ${state.total}`;
   }
 
-  function prev() { current = (current - 1 + totalImages) % totalImages; update(); preload(current); }
-  function next() { current = (current + 1) % totalImages; update(); preload(current); }
+  function prevImage() { state.current = (state.current - 1 + state.total) % state.total; updateLightbox(); preload(state.current); }
+  function nextImage() { state.current = (state.current + 1) % state.total; updateLightbox(); preload(state.current); }
 
-  // Click to open
-  items.forEach((item, i) => {
-    item.addEventListener('click', () => open(i));
-    item.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(i); } });
-  });
+  function setupGallery() {
+    const gallery = document.getElementById('gallery');
+    if (!gallery) return;
 
-  document.getElementById('lb-close').addEventListener('click', close);
-  document.getElementById('lb-prev').addEventListener('click', prev);
-  document.getElementById('lb-next').addEventListener('click', next);
+    state.items     = Array.from(gallery.querySelectorAll('.masonry-item'));
+    state.lightbox  = document.getElementById('lightbox');
+    state.lbImg     = document.getElementById('lb-img') as HTMLImageElement;
+    state.lbCounter = document.getElementById('lb-counter');
+    state.total     = state.items.length;
+    state.current   = 0;
 
-  // Click backdrop to close
-  lightbox.addEventListener('click', e => { if (e.target === lightbox) close(); });
+    // ── Blur-up: mark already-cached images as loaded ──
+    state.items.forEach(item => {
+      const img = item.querySelector('img.photo') as HTMLImageElement;
+      if (img && img.complete) img.classList.add('loaded');
+    });
 
-  // Keyboard navigation
-  document.addEventListener('keydown', e => {
-    if (!lightbox.classList.contains('is-open')) return;
-    if (e.key === 'Escape')     close();
-    if (e.key === 'ArrowLeft')  prev();
-    if (e.key === 'ArrowRight') next();
-  });
+    // ── Scroll-reveal via IntersectionObserver ──
+    gallery.classList.add('reveal-on');
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+      state.items.forEach(item => io.observe(item));
+    } else {
+      // No support — just show everything
+      state.items.forEach(item => item.classList.add('in-view'));
+    }
 
-  // Touch/swipe support
-  let touchStartX = 0;
-  lightbox.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
-  lightbox.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
-  });
+    // ── Click / keyboard to open (per-page elements, safe to re-bind) ──
+    state.items.forEach((item, i) => {
+      item.addEventListener('click', () => openLightbox(i));
+      item.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLightbox(i); }
+      });
+    });
+
+    document.getElementById('lb-close')!.addEventListener('click', closeLightbox);
+    document.getElementById('lb-prev')!.addEventListener('click', prevImage);
+    document.getElementById('lb-next')!.addEventListener('click', nextImage);
+    state.lightbox!.addEventListener('click', (e) => { if (e.target === state.lightbox) closeLightbox(); });
+
+    // Touch/swipe
+    let touchStartX = 0;
+    state.lightbox!.addEventListener('touchstart', (e: TouchEvent) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    state.lightbox!.addEventListener('touchend', (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 50) { dx < 0 ? nextImage() : prevImage(); }
+    });
+  }
+
+  // Document-level keyboard nav — added ONCE, reads current state.
+  if (!(window as any).__galleryKeysBound) {
+    (window as any).__galleryKeysBound = true;
+    document.addEventListener('keydown', (e) => {
+      if (!state.lightbox || !state.lightbox.classList.contains('is-open')) return;
+      if (e.key === 'Escape')     closeLightbox();
+      if (e.key === 'ArrowLeft')  prevImage();
+      if (e.key === 'ArrowRight') nextImage();
+    });
+  }
+
+  // Run on first load AND after every view transition.
+  document.addEventListener('astro:page-load', setupGallery);
 </script>
