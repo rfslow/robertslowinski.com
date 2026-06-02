@@ -86,6 +86,7 @@ const EAGER_COUNT = 10;
     lbCounter: null as HTMLElement | null,
     current: 0,
     total: 0,
+    reqId: 0,
   };
 
   function preload(index: number) {
@@ -113,17 +114,31 @@ const EAGER_COUNT = 10;
     state.items[state.current]?.focus();
   }
 
+  function toThumb(src: string): string {
+    const parts = src.split('/');
+    const file = parts.pop();
+    return [...parts, 'thumbs', file].join('/');
+  }
+
   function updateLightbox() {
     const item = state.items[state.current];
     const fullSrc = item.dataset.src!;
+    const reqId = ++state.reqId;
     state.lbImg!.alt = item.dataset.alt!;
-    state.lbImg!.style.opacity = '0.6';
+
+    // Show the already-cached thumbnail instantly — correct image, no stale
+    // remnant of the previously-viewed photo, no blank flash.
+    state.lbImg!.src = toThumb(fullSrc);
+    state.lbImg!.style.opacity = '1';
+
+    // Then load the full-resolution version and swap it in when ready,
+    // but only if the user hasn't navigated to a different image meanwhile.
     const full = new Image();
     full.onload = () => {
-      state.lbImg!.src = fullSrc;
-      state.lbImg!.style.opacity = '1';
+      if (reqId === state.reqId) state.lbImg!.src = fullSrc;
     };
     full.src = fullSrc;
+
     state.lbCounter!.textContent = `${state.current + 1} / ${state.total}`;
   }
 

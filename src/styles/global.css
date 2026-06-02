@@ -165,8 +165,8 @@ img { display: block; max-width: 100%; }
 /* ── Scroll-reveal: tiles fade & rise as they enter the viewport ── */
 .reveal-on .masonry-item {
   opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transform: translateY(32px);
+  transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .reveal-on .masonry-item.in-view {
   opacity: 1;
