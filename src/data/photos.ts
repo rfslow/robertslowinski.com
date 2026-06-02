@@ -4,12 +4,17 @@
 // PINNED photos are managed via the admin UI (run: npm run admin)
 // or by editing src/data/pinned.json directly.
 //
+// HIDDEN photos are managed the same way and never appear on the live site.
+// Hiding does NOT delete the file — it just removes it from the gallery, so
+// you can always un-hide later. Managed in src/data/hidden.json.
+//
 // NEW photos are inserted automatically by add-photos.sh.
 //
 // ARCHIVE is the original curated order — leave it alone.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import pinnedData from './pinned.json';
+import hiddenData from './hidden.json';
 
 function toFile(category: string, filename: string): string {
   return `/images/${category}/${filename}`;
@@ -96,19 +101,29 @@ const lifestyleArchive = [
 ];
 
 // ── Exports ───────────────────────────────────────────────────────────────────
-// Combines pinned + new + archive for each category.
+// Combines pinned + new + archive for each category, minus any hidden photos.
 
-function makePhotos(category: string, pinned: string[], newPhotos: string[], archive: string[]) {
-  // Deduplicate: pinned photos are removed from archive/new so they only appear once
+function makePhotos(
+  category: string,
+  pinned: string[],
+  newPhotos: string[],
+  archive: string[],
+  hidden: string[],
+) {
+  const hide = new Set(hidden);
+  // Deduplicate: pinned photos are removed from archive/new so they only appear once.
   const seen = new Set([...pinned, ...newPhotos]);
-  const filteredArchive = archive.filter(f => !seen.has(f));
-  return [...pinned, ...newPhotos, ...filteredArchive].map((filename, i) => ({
+  // Filter out hidden photos everywhere, and dedupe the archive.
+  const filteredPinned  = pinned.filter(f => !hide.has(f));
+  const filteredNew     = newPhotos.filter(f => !hide.has(f));
+  const filteredArchive = archive.filter(f => !seen.has(f) && !hide.has(f));
+  return [...filteredPinned, ...filteredNew, ...filteredArchive].map((filename, i) => ({
     src: toFile(category, filename),
     alt: `${category.charAt(0).toUpperCase() + category.slice(1)} photograph ${i + 1}`,
     index: i,
   }));
 }
 
-export const travelPhotos   = makePhotos('travel',    travelPinned,    travelNew,    travelArchive);
-export const outdoorsPhotos = makePhotos('outdoors',  outdoorsPinned,  outdoorsNew,  outdoorsArchive);
-export const lifestylePhotos = makePhotos('lifestyle', lifestylePinned, lifestyleNew, lifestyleArchive);
+export const travelPhotos   = makePhotos('travel',    travelPinned,    travelNew,    travelArchive,    hiddenData.travel);
+export const outdoorsPhotos = makePhotos('outdoors',  outdoorsPinned,  outdoorsNew,  outdoorsArchive,  hiddenData.outdoors);
+export const lifestylePhotos = makePhotos('lifestyle', lifestylePinned, lifestyleNew, lifestyleArchive, hiddenData.lifestyle);

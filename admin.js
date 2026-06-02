@@ -16,17 +16,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT        = 3333;
 const ROOT        = __dirname;
 const PINNED_FILE = path.join(ROOT, 'src/data/pinned.json');
+const HIDDEN_FILE = path.join(ROOT, 'src/data/hidden.json');
 const PUBLIC_DIR  = path.join(ROOT, 'public');
 const MAX_PINS    = 6;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function readPinned() {
-  return JSON.parse(fs.readFileSync(PINNED_FILE, 'utf8'));
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
-function writePinned(data) {
-  fs.writeFileSync(PINNED_FILE, JSON.stringify(data, null, 2) + '\n');
+function writeJson(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
 }
 
 function getCategoryPhotos(category) {
@@ -66,20 +67,22 @@ const server = http.createServer(async (req, res) => {
 
   // API: get all data
   if (url.pathname === '/api/data') {
-    const pinned   = readPinned();
+    const pinned   = readJson(PINNED_FILE);
+    const hidden   = readJson(HIDDEN_FILE);
     const photos   = {
       travel:    getCategoryPhotos('travel'),
       outdoors:  getCategoryPhotos('outdoors'),
       lifestyle: getCategoryPhotos('lifestyle'),
     };
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ pinned, photos, maxPins: MAX_PINS }));
+    return res.end(JSON.stringify({ pinned, hidden, photos, maxPins: MAX_PINS }));
   }
 
-  // API: save pinned
+  // API: save pinned + hidden
   if (url.pathname === '/api/save' && req.method === 'POST') {
     const body = await parseBody(req);
-    writePinned(body);
+    if (body.pinned) writeJson(PINNED_FILE, body.pinned);
+    if (body.hidden) writeJson(HIDDEN_FILE, body.hidden);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -89,7 +92,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.write('Building...\n');
     exec(
-      'npm run build && npx wrangler pages deploy dist --project-name robertslowinski-com && git add src/data/pinned.json && git commit -m "Update pinned photos" && git push',
+      'npm run build && npx wrangler pages deploy dist --project-name robertslowinski-com && git add src/data/pinned.json src/data/hidden.json && git commit -m "Update pinned/hidden photos" && git push',
       { cwd: ROOT },
       (err, stdout, stderr) => {
         if (err) res.end('ERROR:\n' + stderr);
@@ -171,6 +174,26 @@ body{font-family:system-ui,sans-serif;background:#f9f8f6;color:#222;min-height:1
 .pin-badge.is-pinned{background:#c8a84b}
 .grid-item.is-pinned{outline:2px solid #c8a84b;outline-offset:-2px}
 
+/* Hide button (top-right of each photo, appears on hover) */
+.hide-btn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);color:#fff;
+  font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;cursor:pointer;
+  opacity:0;transition:opacity .15s;z-index:2;border-radius:2px}
+.grid-item:hover .hide-btn{opacity:1}
+.hide-btn:hover{background:#b00}
+
+/* Hidden photos: dimmed with a label */
+.grid-item.is-hidden img{opacity:.28;filter:grayscale(.6)}
+.grid-item.is-hidden{outline:2px solid #b00;outline-offset:-2px}
+.hidden-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:#b00;color:#fff;font-size:.62rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;padding:3px 8px;pointer-events:none;z-index:1}
+.grid-item.is-hidden .hide-btn{background:#b00;opacity:1}
+
+/* Filter toggle */
+.filter-toggle{font-size:.7rem;letter-spacing:.06em;color:#888;cursor:pointer;
+  display:flex;align-items:center;gap:.4rem;user-select:none}
+.filter-toggle input{cursor:pointer}
+
 /* Buttons */
 .btn{padding:.55rem 1.2rem;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
   cursor:pointer;transition:all .2s;border:1px solid #222;background:none;color:#222}
@@ -210,11 +233,18 @@ body{font-family:system-ui,sans-serif;background:#f9f8f6;color:#222;min-height:1
 <div class="tabs" id="tabs"></div>
 
 <div class="pinned-section">
-  <div class="pinned-label">Pinned photos — appear first on the page (click a photo below to pin, click × to unpin)</div>
+  <div class="pinned-label">Click a photo to pin it (gold ★, shows first on the page). Hover a photo and click “Hide” to remove it from the live site — hiding never deletes the file.</div>
   <div class="pinned-tray" id="pinned-tray"></div>
 </div>
 
 <div class="gallery-wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+    <span class="badge" id="counts"></span>
+    <label class="filter-toggle">
+      <input type="checkbox" id="show-hidden" checked onchange="renderGrid(currentCat)">
+      Show hidden photos in this view
+    </label>
+  </div>
   <div class="grid" id="grid"></div>
 </div>
 
@@ -281,18 +311,39 @@ function renderTray(cat) {
 function renderGrid(cat) {
   const grid = document.getElementById('grid');
   const pins = data.pinned[cat];
-  grid.innerHTML = data.photos[cat].map(photo => {
+  const hidden = data.hidden[cat];
+  const showHidden = document.getElementById('show-hidden').checked;
+
+  const visible = data.photos[cat].filter(p => showHidden || !hidden.includes(p.filename));
+
+  grid.innerHTML = visible.map(photo => {
     const pinIdx = pins.indexOf(photo.filename);
     const isPinned = pinIdx >= 0;
+    const isHidden = hidden.includes(photo.filename);
     return \`
-      <div class="grid-item \${isPinned?'is-pinned':''}" onclick="togglePin('\${cat}','\${photo.filename}')">
-        <img src="\${photo.thumb}" alt="\${photo.filename}" loading="lazy">
+      <div class="grid-item \${isPinned?'is-pinned':''} \${isHidden?'is-hidden':''}" data-file="\${photo.filename}">
+        <img src="\${photo.thumb}" alt="\${photo.filename}" loading="lazy"
+             onclick="togglePin('\${cat}','\${photo.filename}')">
         \${isPinned ? \`<div class="pin-badge is-pinned">★\${pinIdx+1}</div>\` : ''}
+        \${isHidden ? \`<div class="hidden-label">Hidden</div>\` : ''}
+        <div class="hide-btn" onclick="toggleHide('\${cat}','\${photo.filename}')">\${isHidden?'Show':'Hide'}</div>
       </div>\`;
   }).join('');
+
+  // Update counts
+  const total = data.photos[cat].length;
+  const hiddenCount = hidden.length;
+  const liveCount = total - hiddenCount;
+  document.getElementById('counts').textContent =
+    \`\${liveCount} live · \${hiddenCount} hidden · \${total} total\`;
 }
 
 function togglePin(cat, filename) {
+  // Don't allow pinning a hidden photo
+  if (data.hidden[cat].includes(filename)) {
+    showToast('Un-hide this photo before pinning it');
+    return;
+  }
   const pins = data.pinned[cat];
   const idx = pins.indexOf(filename);
   if (idx >= 0) {
@@ -303,6 +354,22 @@ function togglePin(cat, filename) {
       return;
     }
     pins.push(filename);
+  }
+  dirty = true;
+  setStatus('Unsaved changes');
+  renderCat(cat);
+}
+
+function toggleHide(cat, filename) {
+  const hidden = data.hidden[cat];
+  const idx = hidden.indexOf(filename);
+  if (idx >= 0) {
+    hidden.splice(idx, 1);          // un-hide
+  } else {
+    hidden.push(filename);          // hide
+    // If it was pinned, un-pin it (a hidden photo can't be pinned)
+    const pinIdx = data.pinned[cat].indexOf(filename);
+    if (pinIdx >= 0) data.pinned[cat].splice(pinIdx, 1);
   }
   dirty = true;
   setStatus('Unsaved changes');
@@ -320,7 +387,7 @@ async function save() {
   await fetch('/api/save', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data.pinned)
+    body: JSON.stringify({ pinned: data.pinned, hidden: data.hidden })
   });
   dirty = false;
   setStatus('Saved ✓ (not yet deployed)');
