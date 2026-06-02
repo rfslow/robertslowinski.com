@@ -22,35 +22,40 @@ function lqip(src: string): string {
   return (placeholders as Record<string, string>)[key] ?? '';
 }
 
-// First 15 images are above the fold — load eagerly, rest lazily
-const EAGER_COUNT = 15;
+// Only the first ~10 images (roughly what's visible on arrival) load immediately.
+// Everything else loads just-in-time as it scrolls toward the viewport.
+const EAGER_COUNT = 10;
 ---
 
 <div class={`masonry ${extraClass}`} id="gallery">
-  {images.map((img) => (
-    <div
-      class="masonry-item"
-      data-index={img.index}
-      data-src={img.src}
-      data-alt={img.alt}
-      tabindex="0"
-      role="button"
-      aria-label={`Open ${img.alt} in lightbox`}
-    >
-      <div class="lqip" style={`background-image:url(${lqip(img.src)})`}></div>
-      <img
-        class="photo"
-        src={thumbSrc(img.src)}
-        alt={img.alt}
-        width={img.width}
-        height={img.height}
-        loading={img.index < EAGER_COUNT ? 'eager' : 'lazy'}
-        decoding={img.index < EAGER_COUNT ? 'sync' : 'async'}
-        fetchpriority={img.index < 5 ? 'high' : undefined}
-        onload="this.classList.add('loaded')"
-      />
-    </div>
-  ))}
+  {images.map((img) => {
+    const eager = img.index < EAGER_COUNT;
+    const thumb = thumbSrc(img.src);
+    return (
+      <div
+        class="masonry-item"
+        data-index={img.index}
+        data-src={img.src}
+        data-alt={img.alt}
+        tabindex="0"
+        role="button"
+        aria-label={`Open ${img.alt} in lightbox`}
+      >
+        <div class="lqip" style={`background-image:url(${lqip(img.src)})`}></div>
+        <img
+          class="photo"
+          src={eager ? thumb : undefined}
+          data-thumb={eager ? undefined : thumb}
+          alt={img.alt}
+          width={img.width}
+          height={img.height}
+          decoding="async"
+          fetchpriority={img.index < 5 ? 'high' : undefined}
+          onload="this.classList.add('loaded')"
+        />
+      </div>
+    );
+  })}
 </div>
 
 <!-- Lightbox -->
@@ -136,27 +141,48 @@ const EAGER_COUNT = 15;
     state.total     = state.items.length;
     state.current   = 0;
 
-    // ── Blur-up: mark already-cached images as loaded ──
+    // ── Blur-up: mark already-loaded (eager/cached) images as loaded ──
     state.items.forEach(item => {
       const img = item.querySelector('img.photo') as HTMLImageElement;
-      if (img && img.complete) img.classList.add('loaded');
+      if (img && img.getAttribute('src') && img.complete) img.classList.add('loaded');
     });
 
-    // ── Scroll-reveal via IntersectionObserver ──
     gallery.classList.add('reveal-on');
+
     if ('IntersectionObserver' in window) {
-      const io = new IntersectionObserver((entries) => {
+      // Observer 1: just-in-time loading. Fires ~500px before a tile is visible
+      // so the photo is ready by the time you scroll to it. Only visible-ish
+      // images ever get fetched — not all 80+ at once.
+      const loadObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const img = entry.target.querySelector('img.photo') as HTMLImageElement;
+          if (img && img.dataset.thumb && !img.getAttribute('src')) {
+            img.src = img.dataset.thumb;
+            if (img.complete) img.classList.add('loaded');
+          }
+          loadObserver.unobserve(entry.target);
+        });
+      }, { rootMargin: '500px 0px', threshold: 0 });
+
+      // Observer 2: reveal animation, fires right as the tile enters view.
+      const revealObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             entry.target.classList.add('in-view');
-            io.unobserve(entry.target);
+            revealObserver.unobserve(entry.target);
           }
         });
       }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
-      state.items.forEach(item => io.observe(item));
+
+      state.items.forEach(item => { loadObserver.observe(item); revealObserver.observe(item); });
     } else {
-      // No support — just show everything
-      state.items.forEach(item => item.classList.add('in-view'));
+      // No IntersectionObserver — load and show everything
+      state.items.forEach(item => {
+        const img = item.querySelector('img.photo') as HTMLImageElement;
+        if (img && img.dataset.thumb && !img.getAttribute('src')) img.src = img.dataset.thumb;
+        item.classList.add('in-view');
+      });
     }
 
     // ── Click / keyboard to open (per-page elements, safe to re-bind) ──
