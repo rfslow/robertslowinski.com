@@ -152,10 +152,14 @@ open(ts_path, 'w').write(new_text)
 print(f"✅ Inserted {len(insert.strip().splitlines())} filename(s) into {category} NEW section.")
 PYEOF
 
-# ── Git commit and push ───────────────────────────────────────────────────────
+# ── Generate blur-up placeholders for the new photos ─────────────────────────
 cd "$SCRIPT_DIR"
+echo ""
+echo "🎨 Generating blur-up placeholders..."
+node generate-placeholders.js > /dev/null 2>&1 && echo "   Done."
 
-git add public/images/"$CATEGORY"/ src/data/photos.ts
+# ── Git commit and push ───────────────────────────────────────────────────────
+git add public/images/"$CATEGORY"/ src/data/photos.ts src/data/placeholders.json
 
 COUNT=${#ADDED_FILENAMES[@]}
 COMMIT_MSG="Add $COUNT new $CATEGORY photo(s)"
